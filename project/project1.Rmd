@@ -1,0 +1,221 @@
+---
+title: Impact of COVID-19 In-Patient Hospitalization on Mortality Counts in the United States
+output: html_document
+---
+
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, fig.align = "center", warning = F, message = F, R.options=list(max.print=100,dplyr.print_max=100))
+```
+
+## Name: Hung Nguyen
+## UT EID: htn858
+
+------------------------------------------------------------------------
+
+## Background and Introduction
+
+
+  Ever since the first case positive for COVID-19 in the United States in early 2020, the COVID-19 pandemic has caused a significantly high number of individuals positive for COVID-19 and has put substantial pressure on hospitals across the U.S due to the high number of patients needing to be hospitalized. Due to immediate life-threatening symptoms in COVID-19 patients, many hospitals were forced to reallocate their resources to treating in-patient COVID-19 patients while releasing and refusing patients whose conditions are not of a high degree of urgency. The first set of data that I will be using for my analysis is from the COVID Tracking Project group. The dataset is a collection of the COVID-19 case counts and the number of hospitalized patients in every state and territory in the United States. The dataset from the COVID Tracking Project group contains a total of 20,780 observations across 41 columns, entailing daily counts of COVID-19 new and current patients in hospitals from January March 7th, 2020, to March 7th, 2021. The 41 columns include data on the date of the entries, the states, the mortality numbers and rates due to COVID-19 symptoms, the number of hospitalized patients, the antibodies and viral test results, and the number of patients on ventilators. The second set of data that I will be using for my analysis is from the Centers for Disease Control and Prevention, a U.S government public health agency. The dataset from the CDC contains a total of 27 observations across 31 columns, entailing monthly mortality counts grouped by the underlying medical conditions that caused the death of those patients from early 2020 to early 2022. The 33 columns include data on the start and end dates of the entries, the jurisdiction, the total count of mortality, and the count of mortality due to various medical conditions such as natural causes, septicemia, diabetes, Alzheimer's, respiratory diseases, and accidents.
+
+  In this study, my goal is to find correlations in the number of mortalities for various medical conditions that were affected due to the number of patients who were hospitalized due to COVID-19 in 2020. I found both datasets in my study to be interesting because the combined dataset may shed light into the question of whether the number of mortality due to other diseases have a relationship with the number of COVID-19 patient, which is a topic that I am interested in researching about. The COVID-19 pandemic has put tremendous pressure across hospitals nationwide, and since most hospitals only have limited resources available, they have to reallocate their resources and plan carefully to avoid overcrowding and increasing mortality counts. Therefore, I am very interested to see how hospitals manage their patients at level of COVID-19 patients and whether they were successful in combating the issue of high mortality counts by reallocating their resources properly. The dataset by the COVID Tracking Project group contain data about the number of hospitalized patients, and the dataset by the CDC contain data about the counts of mortality due to various medical diseases, and therefore, both datasets contain pieces that may help provide answers to my topic of interest. 
+
+  I hypothesize that the number of mortalities for heart diseases and diabetes has a direct relationship with the number of COVID-19 patients, while the number of mortalities for respiratory diseases will have an inverse relationship with the number of COVID-19 patients. Heart diseases and diabetes are chronic diseases, which means that they tend to persist for a long period of time and will not cause immediate symptoms to develop in patients. Therefore, my reasoning for the direct relationship between heart diseases and diabetes number of mortalities to COVID-19 hospitalized patients is that hospitals will more likely to accept patients with COVID-19 due to their acute symptoms (symptoms that immediately manifest) than patients with heart diseases and diabetes, whose symptoms do not immediately manifest and therefore would not be deemed life-threatening until it’s too late for those patients. On the other hand, my reasoning for the inverse relationship between respiratory diseases and the number of COVID-19 hospitalized patients is that COVID-19 is a respiratory disease, and its symptoms resemble other respiratory diseases very similarly. Therefore, the misclassification of mortality due to COVID-19 is likely to be very high and would inflate the actual number of COVID-19 cases while underreporting the number of other respiratory diseases, hence inverse relationships between those variables. 
+
+References:
+
+Monthly counts of deaths by select causes, 2020-2021. (2021). Centers for Disease Control and Prevention. https://catalog.data.gov/dataset/monthly-counts-of-deaths-by-select-causes-2020-2021-2785a
+
+The data. (2020). The COVID Tracking Project. Retrieved March 17, 2022, from https://covidtracking.com/data
+
+## Tidying
+
+  The CDC mortality dataset is tidy, with each variable that the dataset use (year, month, causes of mortality) having its own column and every unique (monthly) observation from January 2020 to March 2022 having its own rows. The COVID hospitalization dataset is also tidy, with each daily COVID entry observation per states from 13th January of 2020 to 03 March of 20201 having its own rows and each variable that the dataset use (date, state, hospitalized and death counts, viral testing counts) having its own column. Since both datasets are tidy, we can move onto joining them together to make the combined dataset.
+  
+## Joining and Merging
+  
+```{r}
+# Call the tidyverse package
+library(tidyverse)
+
+# Download and display the `CovidData` dataset
+CovidData <- read.csv('https://covidtracking.com/data/download/all-states-history.csv')
+# Download and display the `MonthlyMortalityData` dataset
+MonthlyMortalityData <- read.csv('https://data.cdc.gov/api/views/9dzk-mvmi/rows.csv?accessType=DOWNLOAD')
+
+# Show information about the types of each of the column in the dataset `CovidData` and the data that they contain
+glimpse(CovidData)
+# Show information about the types of each of the column in the dataset `MonthlyMortalityData` and the data that they contain
+glimpse(MonthlyMortalityData)
+
+# Group the `CovidData` dataset by date, sum up the daily observations across the states and territories into total daily observations, and save the new dataset in the object `DailyCovidData`
+DailyCovidData <- CovidData %>%
+  # Group the dataset by date
+  group_by(date) %>%
+  # Sum up the daily observations across all daily observations into total daily observations (by date)
+  summarize_if(is.numeric, sum, na.rm=TRUE)
+```
+
+Process: In the initial stage, both datasets are not ready to be joined. This is because the CDC mortality dataset contains monthly entries while the COVID hospitalization dataset contains daily entries. Therefore, a standardized date system is needed for the joining of the two datasets to be successful. In the COVID hospitalization dataset, the number of daily hospitalized patients for the states together make up the number of total daily hospitalized patients. Since the CDC dataset contained monthly entries, a way to standardized the two datasets is by combining the daily hospitalized patients for the states in the COVID hospitalization dataset into daily total hospitalized patients (grouping by date). In the original `CovidData` dataset, there were 20,780 observations of 41 variables, but after grouping and summarization tidying to prepare for merging, the modified `DailyCovidData` now have 420 observations of 40 variables, therefore a dropping of 20,360 observations and 1 variable.
+
+```{r}
+# Separate the `date` column, group the `DailyCovidData` dataset by `Month` and `Year` columns, sum up the total daily observations, then save the new dataset in the object `MonthlyCovidData`
+MonthlyCovidData <- DailyCovidData %>%
+  # Separate the `date` column into 3 columns ("Year", "Month", "Day")format, specifying the separation by the dash (-) symbol
+  separate(date, into = c("Year", "Month", "Day"), sep = "-") %>%
+  # Group the dataset by the year and the month
+  group_by(Year, Month) %>%
+  # Sum up the total daily observations into total monthly observations (by the months) 
+  summarize_if(is.numeric, sum, na.rm=TRUE) %>%
+  # Change the "Year" and "Month" columns from character to integer type
+  mutate_at(c("Year", "Month"), as.integer)
+
+# Show information about the types of each of the column in the dataset `MonthlyMortalityData` and the data that they contain
+glimpse(MonthlyCovidData)
+```
+
+Process: In this step, I combine the daily total hospitalized patients into monthly total hospitalized patients (grouping by month). The purpose of this step is to match the Covid dataset to be monthly observations to match the monthly observations in the mortality dataset, therefore matching up the two datasets for joining. From previous glimpse of the Covid dataset, the `date` column is unusual in that its type is character (which did not match the `month` column in the mortality dataset where the type is integer), so after the `date` column is separated into `year`, `month`, and `day` columns, the types for `year` and `month` is change to integer to match that of the other column. The purpose of the separation of the `date` column is to allow for the creation of a unique ID (`month`) that is similar to the unique ID of the other dataset (`month`) so that the two datasets can be combine. In the original `DailyCovidData` dataset, there were 420 observations of 40 variables, but after grouping and summarization tidying to prepare for merging, the modified `MonthlyCovidData` now have 15 observations of 40 variables, therefore a dropping of 405 observations and 0 variable.
+
+```{r}
+# Show information about the types of each of the column in the dataset `MonthlyCovidData` and the data that they contain
+glimpse(MonthlyCovidData)
+
+# Show information about the types of each of the column in the dataset `MonthlyMortalityData` and the data that they contain
+glimpse(MonthlyMortalityData)
+
+# Unite the observations in the "Month" and "Year" columns in the `MonthlyCovidData` dataset into a new column called "MonthYear", specify the separation by the symbol "/", and override the modified dataset into the variable "MonthlyCovidData"
+MonthlyCovidData <- MonthlyCovidData %>%
+   unite(MonthYear, Month, Year, sep = "/")
+
+# Unite the observations in the "Month" and "Year" columns in the `MonthlyMortalityData` dataset into a new column called "MonthYear", specify the separation by the symbol "/", and override the modified dataset into the variable "MonthlyMortalityData"
+MonthlyMortalityData <- MonthlyMortalityData %>%
+   unite(MonthYear, Month, Year, sep = "/")
+
+# Join the "MonthlyCovidData" and the "MonthlyMortalityData" together by the 'MonthYear' column
+CovidImpact <- MonthlyCovidData %>%
+  left_join(MonthlyMortalityData, by = "MonthYear")
+```
+
+Process: In my initial joining of the two datasets by the column "Month", I discovered that the "Month" column of the two datasets is not uniquely enough to allow for proper joining. Therefore, to make the "Month" column more unique while also trying to preserve the idea of joining by "Month", I decided to join the month and year columns of each dataset together into a new column called "MonthYear", and then use that new column as the unique ID that will be use to join the two datasets together. 
+ In the "MonthlyCovidData", the only unique ID is the "Month" variable, which was united with the "Year" variable to create the unique ID "MonthYear". In the "MonthlyMortalityData", the unique IDs are the "Start.Date", the "End.Date", and the "Month" variables; the unique ID "Month" variable was united with the "Year" variable to create the unique ID "MonthYear". The IDs that are common between the two datasets are the "Month" and "Year" IDs, which was united to create the common ID "MonthYear". Every other columns beside the "Month" and "Year" columns in the two datasets are different and does not appear in the other dataset (i.e."death", "hospitalized", "All.Cause", "Natural.Cause", etc.). Before joining, the "MonthlyCovidData" dataset have a total of 15 observations of 40 variables and the "MonthlyMortalityData" dataset have a total of 27 observations of 30 variables. After left joining the "MonthlyMortalityData" to the "MonthlyCovidData" by the ID "MonthYear", the combined "CovidImpact" dataset have a total of 15 observations of 69 columns. Compared to the "MonthlyCovidData" dataset, 0 observation and 29 columns were added to the dataset after joining. Compared to the "MonthlyMortalityData" dataset, 12 observations were removed and 39 observations were removed from the dataset after joining. When comparing the expected combined values (42 observations of 70 variables for both datasets combined) to the actual combined values (15 observations of 69 variables), there was a difference of 27 observations and 1 variable dropped when joining. The observations and variable dropped were expected for this joining because the 1 variable dropped is from the unique ID "MonthYear" for both dataset (so one must be dropped due to duplication) and the observation counts take on the number of the "MonthlyCovidData" observation due to a left join of the dataset "MonthlyMortalityData" to the "MonthlyCovidData" (so observations must be dropped from the "MonthlyMortalityData" to accommodate for the left join). 
+
+## Wrangling
+
+```{r} 
+# Separate the column "MonthYear", add a "Month_Name" column, filter by the year 2020, select only revelant columns, add a case levels column, and save the modified dataset to the object "CovidImpactData"
+CovidImpactData <- CovidImpact %>%
+  # Separate the `date` column into 2 columns (Month", "Day") format, specifying the separation by the dash (/) symbol
+  separate(MonthYear, into = c("Month", "Year"), sep = "/") %>%
+  # Change the "Year" and "Month" columns from character to integer type
+  mutate_at(c("Year", "Month"), as.integer) %>%
+  # Added a new column "Month_Name" that encode for the names of the month
+  mutate(Month_Name = recode(Month, "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")) %>%
+  # Filter by the year 2020
+  filter(Year == "2020") %>%
+  # Arrange the dataset by month in ascending order
+  arrange(Month) %>%
+  # Select only revelant columns for analysis
+  select(Month_Name, Month, Year, death, hospitalized, hospitalizedCurrently, 46:65) %>%
+  # Rename some columns to be clearer
+  rename("Death" = death, "Hospitalized" = hospitalized, "Hospitalized_Currently" = hospitalizedCurrently) %>%
+  # Group by the COVID hospitalization montly counts
+  group_by(Hospitalized_Currently) %>%
+  # Add a cases level column that assess when the COVID hospitalization count is high, medium, or low
+  mutate(Cases_Level = case_when(Hospitalized_Currently > 2000000 ~ "High",
+                                  1000000 <= Hospitalized_Currently & Hospitalized_Currently <= 2000000 ~ "Medium",
+                                  Hospitalized_Currently < 1000000 ~ "Low")) 
+```
+
+  Note: Two new categorical columns are added to the dataset, a "Month_Name" and a "Cases_Level" column. The purpose of the "Cases_Level" column is to differential between the various number of patients that is hospitalized for COVID-19 symptoms by giving boundaries that separate the "Low" (below 1 million patients hospitalized monthly), "Medium (between 1 million and 2 million patients hospitalized monthly), and "High" (above 2 million patients hospitalized monthly). 
+
+```{r}
+# Calculate the mean values for the number of patients hospitalized due to COVID-19 and for mortality due to heart diseases, Alzheimer's Disease, Diabetes, Influenza and Pneumonia, and Chronic Respiratory Diseases
+CovidImpactData %>%
+  # Select the columns in the dataset
+  select(Year, Hospitalized_Currently, Diseases.of.Heart, Alzheimer.Disease, Diabetes.Mellitus, Influenza.and.Pneumonia, Chronic.Lower.Respiratory.Diseases) %>%
+  # Group by the year
+  group_by(Year) %>%
+  # Calculate the mean values for the number of patients hospitalized due to COVID-19 and for mortality due to various medical causes for the year 2020 
+  summarize(Mean_Hospitalized = mean(Hospitalized_Currently, na.rm = T),
+            Mean_Heart_Diseases = mean(Diseases.of.Heart, na.rm = T), 
+            Mean_Alzheimer_Disease = mean(Alzheimer.Disease, na.rm = T),
+            Mean_Diabetes = mean(Diabetes.Mellitus, na.rm = T),
+            Mean_Influenza_Pneumonia = mean(Influenza.and.Pneumonia, na.rm = T),
+            Mean_Respiratory_Diseases = mean(Chronic.Lower.Respiratory.Diseases, na.rm = T))
+```
+Findings: In the year of 2020, the mean number of patients hospitalized due to COVID-19 in the United states is 1,221,822 patients. In 2020, the mean number of patients that succumbed to heart diseases is 58,182 patients. Furthermore, 11,189 patients is mean number of patients that succumbed to Alzheimer's Disease, 8,523 mean patients that succumbed to influenza and pneumonia, and 12,729 mean patients that succumbed to chronic respiratory diseases. Comparing the mean number of patients that have succumbed to various diseases in 2020, we can conclude that relative to the 5 diseases that are presented in this summarize statistic, heart diseases have the highest number of mean mortality at 58,182 patients and diabetes have the lowest number of mean mortality at 8,523 patients for the year of 2020.
+
+```{r}
+# Calculate the mean values at 3 different cases level (low, medium, high) for the number of patients hospitalized due to COVID-19 and for mortality due to heart diseases, Alzheimer's Disease, Diabetes, Influenza and Pneumonia, and Chronic Respiratory Diseases
+CovidImpactData %>%
+  # Select the columns in the dataset
+  select(Month_Name, Cases_Level, Hospitalized_Currently, Diseases.of.Heart, Alzheimer.Disease, Diabetes.Mellitus, Influenza.and.Pneumonia, Chronic.Lower.Respiratory.Diseases) %>%
+  # Group by the cases level
+  group_by(Cases_Level) %>%
+  # Calculate the mean values for the number of patients hospitalized due to COVID-19 and for mortality due to various medical causes for the 3 different cases level
+  summarize(Mean_Hospitalized = mean(Hospitalized_Currently, na.rm = T),
+            Mean_Heart_Diseases = mean(Diseases.of.Heart, na.rm = T), 
+            Mean_Alzheimer_Disease = mean(Alzheimer.Disease, na.rm = T),
+            Mean_Diabetes = mean(Diabetes.Mellitus, na.rm = T),
+            Mean_Influenza_Pneumonia = mean(Influenza.and.Pneumonia, na.rm = T),
+            Mean_Respiratory_Diseases = mean(Chronic.Lower.Respiratory.Diseases, na.rm = T)) %>%
+   # Create 3 columns by differentiate the cases level and keep the mean values from the summarize calculation for the mean hospitalization counts
+   pivot_wider(names_from = Cases_Level,
+                values_from = Mean_Hospitalized)
+```
+
+Findings: In the year of 2020, the mean number of patients hospitalized due to COVID-19 in the United states when the case level is high (above 2 million patients) is 2,818,182 patients. Furthermore, when the case level is medium (between 1 million and 2 milliom patients), the mean number of hospitalized patients is 1,413, 201, and 391,899 average cases of COVID-19 hospitalization when the case level is low. In 2020, the mean number of patients that succumbed to heart diseases when the case level for COVID-19 hospitalization is high is 61,829 patients, 57,823 patients when the case level for COVID-19 hospitalization is medium, and 57,083 when the case level is low. Similarly, when the case number is high for COVID-19 hospitalization, a mean number of 12,412 patients, 9,590 patients, 3,909 patients, and 12,526 patients succumbed to Alzheimer's disease, diabetes, influenza and pneumonia, and chronic respiratory diseases, respectively. When the case number is low for COVID-19 hospitalization, a mean number of 10,675 patients, 8,010 patients, 5,307 patients, and 13,417 patients succumbed to Alzheimer's disease, diabetes, influenza and pneumonia, and chronic respiratory diseases, respectively. When the case number is medium for COVID-19 hospitalization, a mean number of 11,213 patients, 8,610 patients, 3,854 patients, and 12,122 patients succumbed to Alzheimer's disease, diabetes, influenza and pneumonia, and chronic respiratory diseases, respectively. Comparing the mean number of mortality for different diseases, we can see that there are patterns of behaviors at different level of COVID hospitalized cases. Interestingly, when the case level for COVID-19 is high, we can see an uptick in the number of mortality due to heart diseases (61,829 mean mortality at high level compared to 57,823 mean mortality at medium level), and when the case level for COVID-19 is low, we can see a downward in the number of mortality due to heart diseases (57,083 mean mortality at low level compared to 57,823 at medium level). Similar uptick and downward patterns at different case level for COVID-19 can be observed for Alzheimer's disease and diabetes. No conclusion can be made in the patterns for respiratory diseases compared at different case levels since the medium case level does not have a mortality count that is between the high and low mortality values for those diseases. Nonetheless, based on the evidence of this statistical analysis, we can conclude that there may be a direct correlation between the mortality counts due to chronic diseases such as heart diseases, diabetes, and Alzheimer's disease to the case level for COVID-19 hospitalization. 
+
+## Visualization
+
+```{r}
+# Graph the number of COVID-19 Hospitalized in 2020
+CovidImpactData %>%
+  # Select the columns in the dataset
+  select(Month, Year, Cases_Level, Hospitalized_Currently, Diseases.of.Heart, Alzheimer.Disease, Diabetes.Mellitus, Influenza.and.Pneumonia, Chronic.Lower.Respiratory.Diseases) %>%
+  # Group by the year
+  group_by(Year) %>%
+  # Create a plot with month on the x-axis, number of COVID-19 hospitalized on the y-axis, and fill by the case level
+  ggplot(aes(x = Month, y = Hospitalized_Currently, fill = Cases_Level)) +
+  # Specify a barplot
+  geom_bar(stat = "summary", fun.data = "mean_se") +
+  # Change the default theme
+  theme_minimal() +
+  # Change the default scale for the x-axis
+  scale_x_continuous(breaks = 1:12) +
+  # Change the title of the legend
+  scale_fill_discrete(name="Case Level") +
+  # Label the x and y axis of the barplots, label legend title and change size of legend
+  labs(
+    title = "Number of COVID-19 Patients Hospitalized in 2020", 
+    x = "Month",
+    y = "Number of COVID-19 Patients Hospitalized",
+    color = "Case Level") +
+  theme(legend.title = element_text(size = 10)
+  )
+```
+
+Findings: This bar graph displayed the number of COVID-19 Patients that were hospitalized in 2020, with the month on the x-axis, number of COVID-19 patients hospitalized on the y-axis, and the bars are color by the case level. In this graph, we can see that there are 2 months (November and December) where the case level is high, 5 months (April, May, July, August, and October) where the case level is medium, and 5 months (January, February, March, June, and September) where the case level is low. In the graph, the low level cases happens around the beggining of the 2020 year from January to March, the medium level cases happens around the middle of the year from April to October, and high case levels happens around the end of the the 2020 year from November to December. From January to March, there seems to be a steady growth in the number of cases and a spike to medium cases happens in April. The number of COVID-19 hospitalized patients remain stable from April to May, drop down to low level in June, and rise to a steady medium level case from July to October. During the month of November, there seems to be a high spike that cause the case level to be high, and a even high rise in case level from November to December. Based on the graph, we can infer that there are two critical points during the year of 2020 where the case level rise dramatically relative to its previous number; these two points are between March and April and between October and November. 
+
+```{r}
+# Create a graph of changes to the mortality of heart disease over time in the year of 2020
+CovidImpactData %>%
+  # Assign month to the x-axis, heart disease to the y-axis, and color the plot by cases level
+  ggplot(aes(x = Month, y = Diseases.of.Heart, color = Cases_Level, group = 1)) +
+  # Create points in the plot
+  geom_point(size = 3) +
+  # Add lines to connect the points
+  geom_line(aes(Month)) +
+  theme_light() +
+   # Changing the default scale for the x-axis
+  scale_x_continuous(breaks = 1:12) +
+  # Label the x-axis, y-axis, color, theme, legend, and change the size of the legend
+  labs(
+    title = "Relationship of Mortality Due to Heart Diseases to COVID-19 Case Levels", 
+    x = "Month",
+    y = "Heart Diseases Mortality Count",
+    color = "Case Level") +
+  theme(legend.title = element_text(size = 10)
+        )
+```
+Findings: This graph depicts the comparison between the mortality counts due to heart diseases to COVID-19 case levels in the months of year 2020, with the month values on the x-axis, the heart disease mortality count on the y-axis, and the line graph colored by the case level. In this line graph, we can see that the highest counts of heart diseases mortality is in December, where the case level for COVID-19 is high, and the lowest counts of heart disease mortality is in June, where the case level for COVID-19 is low. Interestingly, there are two patterns that emerged from this line graph. The first pattern is that when the COVID-19 case switch to a higher level, the heart disease mortality count also rises. For example, the month of March depicts the COVID-19 case level as low, and in April the COVID-19 case level is medium. During this increase in COVID-19 case level, the number of heart diseases mortality count also increase, from about 61,000 cases in March to 61,500 cases in April. Similar patterns of increasing COVID case level leading to increase in heart diseases mortality count can be seen in the month of June and July, September and October, and October and November. Interestingly, during November, where the COVID-19 case level is high, the prolonged period of high case level into December shows a spike in the heart diseases mortality count, which may indicate that prolongued period of high hospitalization patients may lead to higher cases of heart disease mortality. The second pattern in this graph is that as the COVID-19 case level decrease, there is a lower heart diseases mortality count. For example, during the month of May, where the case level is medium, the decrease in the case level in June seems to cause the heart diseases mortality count to drop from about 56,500 to 53,500 cases. Similar decreasing patterns between the case level and the heart diseases mortality count can be seem in August and September, but an inverse pattern is observe between March and April, therefore the decreasing patterns implication is not as clear for this graph as the increasing pattern. This line graph shows that there may be a correlation between high level of COID-19 hospitalization case to high count of heart disease mortality, but more data is needed to make the correlation clearer.
